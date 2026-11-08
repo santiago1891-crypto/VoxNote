@@ -16,6 +16,7 @@
   <img alt="faster-whisper" src="https://img.shields.io/badge/faster--whisper-CPU_int8-6D28D9?style=for-the-badge">
   <img alt="CTranslate2" src="https://img.shields.io/badge/CTranslate2-4.8-334155?style=for-the-badge">
   <img alt="PyAV" src="https://img.shields.io/badge/PyAV-FFmpeg_embebido-007808?style=for-the-badge&amp;logo=ffmpeg&amp;logoColor=white">
+  <img alt="Ejecutable para Windows" src="https://img.shields.io/badge/Windows-.exe_%C3%BAnico-8B5CF6?style=for-the-badge&amp;logo=windows&amp;logoColor=white">
 </p>
 
 <p align="center">
@@ -42,6 +43,7 @@
   <a href="#características">Características</a> ·
   <a href="#cómo-funciona">Cómo funciona</a> ·
   <a href="#stack-tecnológico">Stack</a> ·
+  <a href="#descarga-y-ejecutable">Descarga</a> ·
   <a href="#instalación">Instalación</a> ·
   <a href="#uso">Uso</a> ·
   <a href="#configuración">Configuración</a> ·
@@ -76,6 +78,7 @@ Está pensada para clases grabadas, reuniones, entrevistas y cualquier grabació
 ## Características
 
 - **Transcripción 100 % local** con `faster-whisper` y CTranslate2 en CPU (int8). Sin GPU ni FFmpeg externo.
+- **Conversaciones con varias voces y ruido de fondo**: Whisper transcribe intervenciones solapadas y el VAD filtra silencios; no etiqueta hablantes.
 - **Cualquier formato habitual**: MP4, MKV, AVI, MOV, WEBM, MP3, WAV, M4A, AAC, FLAC y OGG.
 - **TXT con marcas de tiempo** por segmento y **subtítulos SRT** listos para editar.
 - **Búsqueda dentro de la transcripción**, copia al portapapeles y exportación desde la interfaz.
@@ -126,6 +129,7 @@ flowchart LR
 | IA | **Gemini REST** (`urllib`, sin SDK) | Resumen estructurado en JSON |
 | PDF | **ReportLab 4** | Maquetación local del informe |
 | Credenciales | **keyring** | Administrador de credenciales de Windows |
+| Empaquetado | **PyInstaller 6.22** | Un único `VoxNote.exe` con Python y la interfaz |
 | Pruebas | **pytest** | Backend, exportación, PDF y ajustes del escritorio |
 
 ## Estado del proyecto
@@ -138,22 +142,76 @@ flowchart LR
 | 3. Transcripción local | ✅ | faster-whisper en CPU, VAD y cancelación |
 | 4. API de IA | ✅ | Gemini con JSON estructurado y respaldo |
 | 5. Exportación | ✅ | TXT, SRT y PDF |
-| 6. Calidad y empaquetado | ⏳ | 33 tests en verde; falta instalador y firma |
+| 6. Calidad y empaquetado | ✅ | 33 tests y ejecutable único; falta firma e instalador |
 
 ## Requisitos
 
+**Para usar el ejecutable**
+
 - **Windows 10 u 11** (x64). La interfaz usa WebView2; en Windows 11 viene instalado y en Windows 10 puede requerir el [runtime Evergreen](https://developer.microsoft.com/microsoft-edge/webview2/).
+- **Entre 75 MB y 3 GB de disco** para el modelo de Whisper elegido (el ejecutable ocupa unos 104 MB).
+- **Internet** la primera vez (descarga del modelo) y para generar resúmenes con Gemini.
+- **No hace falta Python, Node, FFmpeg ni GPU.**
+
+**Para compilar o ejecutar desde el código**
+
 - **Python 3.10 o superior** (probado con 3.14).
 - **Node.js 20.19+ o 22.12+** solo para compilar la interfaz (Vite 7).
-- **~1 GB de disco** para dependencias y entre **75 MB y 3 GB** para el modelo de Whisper elegido.
+- **~1 GB de disco** para dependencias y el entorno virtual.
 - **8 GB de RAM recomendados**; los modelos grandes necesitan más.
-- **Internet** solo la primera vez (descarga del modelo) y para generar resúmenes con Gemini.
 - **No hace falta FFmpeg**: `faster-whisper` decodifica con PyAV, que trae FFmpeg embebido.
 - **No hace falta GPU**: el flujo por defecto usa CPU con int8.
 
+## Descarga y ejecutable
+
+La app se distribuye como **un único `VoxNote.exe`** de unos **104 MB**. Incluye Python, el backend, la interfaz React compilada, las DLL de CTranslate2/PyAV y el modelo VAD; en el equipo de destino **no hay que instalar nada más**.
+
+> Descarga la última versión desde **[GitHub Releases](https://github.com/santiago1891-crypto/VoxNote/releases)**.
+
+1. Guarda `VoxNote.exe` en una carpeta con permisos de escritura.
+2. Ejecútalo. La primera vez descarga el modelo de Whisper (`small`, ~484 MB) en `%LOCALAPPDATA%\VoxNote\models`.
+3. Si Windows SmartScreen avisa, elige **Más información → Ejecutar de todas formas**: el binario no está firmado.
+
+El ejecutable es portable: no crea una instalación ni pide permisos de administrador. Al arrancar se descomprime en `%TEMP%` (por eso tarda unos segundos) y usa el WebView2 del sistema. Los ajustes, el historial y las transcripciones siguen guardándose en `%LOCALAPPDATA%\VoxNote` y en la carpeta de salida.
+
+### Compilar el ejecutable
+
+Requisitos: Python 3.10+, Node.js 20.19+/22.12+ y el repositorio clonado. Desde la raíz:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\build_windows.ps1
+```
+
+El script compila la interfaz, instala PyInstaller y deja el resultado en `dist\VoxNote.exe`. Si React ya está compilado, puedes omitir ese paso:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\build_windows.ps1 -SkipFrontend
+```
+
+También puedes invocar PyInstaller directamente:
+
+```powershell
+cd python
+.\.venv\Scripts\python.exe -m pip install -r requirements-build.txt
+cd ..
+.\python\.venv\Scripts\python.exe -m PyInstaller --clean --noconfirm python\voxnote.spec
+```
+
+El spec incluye `frontend/dist`, los modelos ONNX del VAD de faster-whisper, las DLL de CTranslate2 y el icono. `dist/` y `build/` están ignorados por Git.
+
+### Publicar una release
+
+Con [GitHub CLI](https://cli.github.com/) autenticado:
+
+```powershell
+gh release create v0.1.0 .\dist\VoxNote.exe --title "VoxNote 0.1.0" --notes "Primer ejecutable único para Windows."
+```
+
+> El ejecutable no está firmado. Para distribución pública conviene firmarlo con un certificado de código y así evitar el aviso de SmartScreen.
+
 ## Instalación
 
-Descarga o clona el repositorio y ejecuta desde la raíz:
+Para desarrollar o ejecutar sin empaquetar, clona el repositorio y ejecuta desde la raíz:
 
 ```powershell
 cd python
@@ -337,6 +395,7 @@ La clave se envía únicamente a la API de Gemini como parámetro de la petició
 - Las transcripciones se escriben solo en la carpeta que elijas.
 - El historial son los últimos ocho trabajos y vive en el `localStorage` del WebView.
 - pywebview sirve los archivos estáticos de la interfaz en `127.0.0.1:42001`; no expone la API a la red.
+- El ejecutable único se descomprime en una carpeta temporal de `%TEMP%` mientras está abierto; Windows la elimina al cerrar.
 
 ## Pruebas
 
@@ -353,7 +412,7 @@ cd python
 - Normalización de ajustes y rutas del escritorio.
 - Estructura del resumen, extracción de JSON y renderizado del PDF.
 
-Las pruebas no descargan modelos ni necesitan conexión a internet. Para validar la interfaz:
+Las pruebas no descargan modelos ni necesitan conexión a internet. El ejecutable empaquetado se verificó con una transcripción real de 35 segundos (17 eventos, TXT + SRT) y con la generación de un PDF de prueba. Para validar la interfaz:
 
 ```powershell
 cd frontend
@@ -365,7 +424,8 @@ npm run build   # incluye tsc --noEmit
 ```text
 VoxNote/
 ├── assets/
-│   └── banner.svg              # banner del README
+│   ├── banner.svg              # banner del README
+│   └── voxnote.ico             # icono del ejecutable y de la ventana
 ├── docs/
 │   └── capturas/               # capturas para la documentación
 ├── frontend/                   # interfaz React + Vite + Tailwind
@@ -404,10 +464,17 @@ VoxNote/
 │   │       ├── prompts.py      # plantillas del resumen
 │   │       ├── pdf.py          # maquetación con ReportLab
 │   │       └── service.py      # resumen + JSON + PDF
+│   ├── voxnote_launcher.py     # punto de entrada del ejecutable
+│   ├── voxnote.spec            # configuración de PyInstaller
+│   ├── version_info.txt        # metadatos de VoxNote.exe
 │   ├── tests/
 │   ├── requirements.txt
 │   ├── requirements-dev.txt
+│   ├── requirements-build.txt  # PyInstaller
 │   └── pyproject.toml
+├── scripts/
+│   └── build_windows.ps1       # build de React + VoxNote.exe
+├── dist/                       # VoxNote.exe generado (ignorado)
 ├── .gitattributes
 ├── .gitignore
 └── README.md
@@ -419,6 +486,8 @@ VoxNote/
 |---|---|---|
 | `npm.ps1 no se puede cargar` | Política de ejecución de PowerShell | Usa `npm.cmd install` y `npm.cmd run build` |
 | Ventana en blanco o error de WebView2 | Falta el runtime | Instala [WebView2 Evergreen](https://developer.microsoft.com/microsoft-edge/webview2/) |
+| SmartScreen bloquea `VoxNote.exe` | El binario no está firmado | Elige **Más información → Ejecutar de todas formas**; para distribuir, firma el ejecutable |
+| El `.exe` tarda en abrir | Se descomprime en `%TEMP%` al iniciar | Es normal en un archivo único; espera unos segundos |
 | La app muestra datos de demostración | Se abrió `npm run dev` en un navegador | Abre la ventana con `python -m voxnote.desktop --dev` |
 | La primera transcripción tarda mucho | Descarga del modelo o CPU lenta | Espera la primera ejecución; prueba `tiny` o `small` |
 | Se queda sin memoria | Modelo grande con un archivo largo | Usa `small` o `medium` y cierra otras aplicaciones |
@@ -427,7 +496,45 @@ VoxNote/
 | No aparecen los archivos | Carpeta de salida distinta | Revisa Ajustes → Carpeta de salida o usa el botón de carpeta |
 | El historial desaparece | Se borró el almacenamiento del WebView | Es local al perfil de la ventana; vuelve a transcribir |
 
+## Roadmap
 
+- [x] Transcripción local con TXT y SRT.
+- [x] Interfaz de escritorio con búsqueda, historial y exportación.
+- [x] Resumen estructurado con Gemini y PDF local.
+- [x] Pruebas del backend, la exportación y el PDF.
+- [x] Ejecutable único de Windows (`VoxNote.exe`).
+- [ ] Instalador con accesos directos y desinstalador.
+- [ ] Firma de código y actualizaciones.
+- [ ] Exportación a Markdown y Word.
+- [ ] Cola de trabajos por lotes.
+- [ ] Diarización (etiquetas de hablante).
+- [ ] Aceleración opcional por GPU.
+- [ ] Interfaz en varios idiomas.
+
+## Contribuir
+
+1. Haz un fork y crea una rama para tu cambio.
+2. Mantén el estilo del código y añade pruebas cuando corresponda.
+3. Ejecuta `python -m pytest`, `npm run build` y, si tocas el empaquetado, `scripts\build_windows.ps1`.
+4. No incluyas claves, modelos, archivos multimedia, resultados de transcripciones ni el `.exe` generado.
+
+Las ideas, reportes de errores y mejoras de accesibilidad son bienvenidos.
+
+## Créditos
+
+VoxNote se apoya en proyectos excelentes:
+
+- [OpenAI Whisper](https://github.com/openai/whisper) — modelo base de reconocimiento de voz.
+- [faster-whisper](https://github.com/SYSTRAN/faster-whisper) y [CTranslate2](https://github.com/OpenNMT/CTranslate2) — inferencia local eficiente.
+- [PyAV](https://pyav.org/) y FFmpeg — decodificación de audio y video.
+- [pywebview](https://pywebview.flowrl.com/) y WebView2 — ventana nativa.
+- [React](https://react.dev/), [Vite](https://vite.dev/) y [Tailwind CSS](https://tailwindcss.com/) — interfaz.
+- [Google Gemini](https://ai.google.dev/) — resumen estructurado.
+- [ReportLab](https://www.reportlab.com/) — generación del PDF.
+- [keyring](https://github.com/jaraco/keyring) — credenciales del sistema.
+- [PyInstaller](https://pyinstaller.org/) — ejecutable único para Windows.
+
+---
 
 <p align="center">
   <b>VoxNote</b> · Transcripción local, notas claras.<br>

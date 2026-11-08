@@ -40,7 +40,18 @@ from .report import Reporter
 from .transcribe import Segment, TranscriptionResult, models_directory
 
 APP_NAME = "VoxNote"
-FRONTEND_DIST = Path(__file__).resolve().parents[2] / "frontend" / "dist" / "index.html"
+
+
+def _frontend_dist() -> Path:
+    """Localiza la interfaz compilada en desarrollo y en el ejecutable."""
+    if getattr(sys, "frozen", False):
+        base = Path(getattr(sys, "_MEIPASS", Path(sys.executable).resolve().parent))
+    else:
+        base = Path(__file__).resolve().parents[2]
+    return base / "frontend" / "dist" / "index.html"
+
+
+FRONTEND_DIST = _frontend_dist()
 
 # ------------------------------------------------------------------ settings
 
