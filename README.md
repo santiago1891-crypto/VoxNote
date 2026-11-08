@@ -59,7 +59,7 @@ El audio y el video **nunca salen del equipo**: la transcripción corre con `fas
 
 Está pensada para clases grabadas, reuniones, entrevistas y cualquier grabación larga que no quieras subir a una plataforma. No usa base de datos, no tiene telemetría ni servidor de aplicación.
 
-> **Estado:** MVP funcional en Windows. La app de escritorio, la transcripción, la búsqueda, la exportación y el resumen con PDF están implementados y probados. Falta el empaquetado en instalador.
+
 
 ## Vista previa
 
