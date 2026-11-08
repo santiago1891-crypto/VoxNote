@@ -1,0 +1,16 @@
+# Dependencias del backend local de transcripción (Etapa 0-3 de la biblia).
+# Versiones fijadas para reproducibilidad; verificar compatibilidad antes de subir.
+faster-whisper==1.2.1
+ctranslate2==4.8.5
+# PyAV 19 eliminó el parámetro metadata_errors que faster-whisper todavía usa
+# al decodificar rutas. Por eso voxnote/media.py decodifica el audio y le pasa
+# un array float32 al modelo; así no dependemos de esa ruta interna.
+av==19.0.2
+numpy>=1.26,<3
+
+# Resumen con IA y exportación
+reportlab>=4.2
+keyring>=25
+
+# Interfaz de escritorio (WebView2 en Windows)
+pywebview>=6.2

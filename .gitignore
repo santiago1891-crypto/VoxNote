@@ -1,0 +1,49 @@
+docs/Biblia_Proyecto_Transcriptor_IA.md
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+
+python/salida*/
+python/temp/
+*.ndjson
+models/
+*.srt
+*.vtt
+
+# Multimedia de usuario
+*.mp4
+*.mkv
+*.avi
+*.mov
+*.webm
+*.mp3
+*.wav
+*.m4a
+*.aac
+*.flac
+*.ogg
+
+# Secretos
+.env
+.env.*
+*.key
+*.pem
+
+# Node / Tauri (etapas posteriores)
+node_modules/
+dist/
+src-tauri/target/
+src-tauri/gen/
+
+# Editores y sistema
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
