@@ -61,7 +61,7 @@ El audio y el video **nunca salen del equipo**: la transcripción corre con `fas
 
 Está pensada para clases grabadas, reuniones, entrevistas y cualquier grabación larga que no quieras subir a una plataforma. No usa base de datos, no tiene telemetría ni servidor de aplicación.
 
-> **Estado:** MVP funcional en Windows. La app de escritorio, la transcripción, la búsqueda, la exportación y el resumen con PDF están implementados y probados. Falta el empaquetado en instalador.
+
 
 ## Vista previa
 
@@ -132,17 +132,8 @@ flowchart LR
 | Empaquetado | **PyInstaller 6.22** | Un único `VoxNote.exe` con Python y la interfaz |
 | Pruebas | **pytest** | Backend, exportación, PDF y ajustes del escritorio |
 
-## Estado del proyecto
 
-| Etapa | Estado | Detalle |
-|---|:---:|---|
-| 0. Preparación | ✅ | Entorno, dependencias y estructura |
-| 1. Interfaz y selección de archivos | ✅ | React + pywebview, diálogo nativo |
-| 2. Extracción de audio | ✅ | PyAV, sin FFmpeg externo |
-| 3. Transcripción local | ✅ | faster-whisper en CPU, VAD y cancelación |
-| 4. API de IA | ✅ | Gemini con JSON estructurado y respaldo |
-| 5. Exportación | ✅ | TXT, SRT y PDF |
-| 6. Calidad y empaquetado | ✅ | 33 tests y ejecutable único; falta firma e instalador |
+
 
 ## Requisitos
 
