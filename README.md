@@ -130,15 +130,6 @@ flowchart LR
 
 ## Estado del proyecto
 
-| Etapa | Estado | Detalle |
-|---|:---:|---|
-| 0. Preparación | ✅ | Entorno, dependencias y estructura |
-| 1. Interfaz y selección de archivos | ✅ | React + pywebview, diálogo nativo |
-| 2. Extracción de audio | ✅ | PyAV, sin FFmpeg externo |
-| 3. Transcripción local | ✅ | faster-whisper en CPU, VAD y cancelación |
-| 4. API de IA | ✅ | Gemini con JSON estructurado y respaldo |
-| 5. Exportación | ✅ | TXT, SRT y PDF |
-| 6. Calidad y empaquetado | ⏳ | 33 tests en verde; falta instalador y firma |
 
 ## Requisitos
 
