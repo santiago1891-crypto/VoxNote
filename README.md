@@ -17,6 +17,7 @@
   <img alt="CTranslate2" src="https://img.shields.io/badge/CTranslate2-4.8-334155?style=for-the-badge">
   <img alt="PyAV" src="https://img.shields.io/badge/PyAV-FFmpeg_embebido-007808?style=for-the-badge&amp;logo=ffmpeg&amp;logoColor=white">
   <img alt="Ejecutable para Windows" src="https://img.shields.io/badge/Windows-.exe_%C3%BAnico-8B5CF6?style=for-the-badge&amp;logo=windows&amp;logoColor=white">
+  <a href="https://github.com/santiago1891-crypto/VoxNote/releases/download/v0.1.0/VoxNote.exe"><img alt="Descargar VoxNote.exe" src="https://img.shields.io/badge/descargar-VoxNote.exe-22C55E?style=for-the-badge&amp;logo=windows&amp;logoColor=white"></a>
 </p>
 
 <p align="center">
@@ -157,7 +158,16 @@ flowchart LR
 
 La app se distribuye como **un único `VoxNote.exe`** de unos **104 MB**. Incluye Python, el backend, la interfaz React compilada, las DLL de CTranslate2/PyAV y el modelo VAD; en el equipo de destino **no hay que instalar nada más**.
 
-> Descarga la última versión desde **[GitHub Releases](https://github.com/santiago1891-crypto/VoxNote/releases)**.
+> **[Descargar VoxNote.exe v0.1.0](https://github.com/santiago1891-crypto/VoxNote/releases/download/v0.1.0/VoxNote.exe)**<br>
+> [Todas las versiones](https://github.com/santiago1891-crypto/VoxNote/releases)
+
+SHA-256 del ejecutable publicado:
+
+```text
+6a66935a233ac4ac756f9bdb897ec24e6214d57ada7d6e647226481bb7795ecd
+```
+
+Puedes comprobarlo con `certutil -hashfile .\VoxNote.exe SHA256`.
 
 1. Guarda `VoxNote.exe` en una carpeta con permisos de escritura.
 2. Ejecútalo. La primera vez descarga el modelo de Whisper (`small`, ~484 MB) en `%LOCALAPPDATA%\VoxNote\models`.
