@@ -51,6 +51,8 @@ def save_api_key(api_key: str) -> None:
 
     try:
         _keyring().set_password(SERVICE, ACCOUNT, value)
+    except CredentialError:
+        raise
     except Exception as exc:  # pragma: no cover - depende del entorno
         raise CredentialError(
             f"No se pudo guardar la API key en el almacén de Windows: {exc}",

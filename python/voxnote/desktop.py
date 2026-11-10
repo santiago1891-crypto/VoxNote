@@ -438,7 +438,10 @@ class DesktopApi:
             chosen = "txt"
 
         parsed = parse_segments(segments)
-        if not parsed and self._last_text:
+        # Solo se recurre al último texto cuando la interfaz no envió la lista
+        # de segmentos (por ejemplo, una llamada directa a la API). Una lista
+        # vacía puede ser un reciente dañado: no se debe exportar otro archivo.
+        if segments is None and not parsed and self._last_text:
             parsed = [Segment(start=0.0, end=0.0, text=self._last_text)]
 
         if not parsed:
@@ -474,8 +477,12 @@ class DesktopApi:
 
         # Los segmentos llegan de la interfaz: permiten resumir un resultado
         # restaurado (por ejemplo, un reciente) aunque el backend se haya
-        # reiniciado y ya no conserve `_last_text`.
-        transcript = transcript_from_segments(segments) or self._last_text.strip()
+        # reiniciado y ya no conserve `_last_text`. Si la interfaz envía una
+        # lista vacía no se usa el último texto para no resumir otro archivo.
+        if segments is None:
+            transcript = self._last_text.strip()
+        else:
+            transcript = transcript_from_segments(segments)
         if not transcript:
             return {"ok": False, "error": "Primero transcribe un archivo."}
 

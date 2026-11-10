@@ -11,13 +11,13 @@
 
 <p align="center">
   <img alt="Estado" src="https://img.shields.io/badge/estado-MVP_funcional-22C55E?style=for-the-badge">
-  <img alt="Versión" src="https://img.shields.io/badge/versi%C3%B3n-0.1.1-8B5CF6?style=for-the-badge">
+  <img alt="Versión" src="https://img.shields.io/badge/versi%C3%B3n-0.1.2-8B5CF6?style=for-the-badge">
   <img alt="Python" src="https://img.shields.io/badge/Python-3.10%2B-3776AB?style=for-the-badge&amp;logo=python&amp;logoColor=white">
   <img alt="faster-whisper" src="https://img.shields.io/badge/faster--whisper-CPU_int8-6D28D9?style=for-the-badge">
   <img alt="CTranslate2" src="https://img.shields.io/badge/CTranslate2-4.8-334155?style=for-the-badge">
   <img alt="PyAV" src="https://img.shields.io/badge/PyAV-FFmpeg_embebido-007808?style=for-the-badge&amp;logo=ffmpeg&amp;logoColor=white">
   <img alt="Ejecutable para Windows" src="https://img.shields.io/badge/Windows-.exe_%C3%BAnico-8B5CF6?style=for-the-badge&amp;logo=windows&amp;logoColor=white">
-  <a href="https://github.com/santiago1891-crypto/VoxNote/releases/download/v0.1.1/VoxNote.exe"><img alt="Descargar VoxNote.exe" src="https://img.shields.io/badge/descargar-VoxNote.exe-22C55E?style=for-the-badge&amp;logo=windows&amp;logoColor=white"></a>
+  <a href="https://github.com/santiago1891-crypto/VoxNote/releases/download/v0.1.2/VoxNote.exe"><img alt="Descargar VoxNote.exe" src="https://img.shields.io/badge/descargar-VoxNote.exe-22C55E?style=for-the-badge&amp;logo=windows&amp;logoColor=white"></a>
 </p>
 
 <p align="center">
@@ -34,7 +34,7 @@
   <img alt="ReportLab" src="https://img.shields.io/badge/ReportLab-PDF_local-B91C1C?style=for-the-badge">
   <img alt="keyring" src="https://img.shields.io/badge/keyring-Credential_Manager-475569?style=for-the-badge">
   <img alt="Windows" src="https://img.shields.io/badge/Windows-10_%2F_11-0078D4?style=for-the-badge&amp;logo=windows11&amp;logoColor=white">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-33_passing-0A9EDC?style=for-the-badge&amp;logo=pytest&amp;logoColor=white">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-67_passing-0A9EDC?style=for-the-badge&amp;logo=pytest&amp;logoColor=white">
   <img alt="Privacidad" src="https://img.shields.io/badge/audio-100%25_local-10B981?style=for-the-badge">
 </p>
 
@@ -158,13 +158,13 @@ flowchart LR
 
 La app se distribuye como **un único `VoxNote.exe`** de unos **104 MB**. Incluye Python, el backend, la interfaz React compilada, las DLL de CTranslate2/PyAV y el modelo VAD; en el equipo de destino **no hay que instalar nada más**.
 
-> **[Descargar VoxNote.exe v0.1.1](https://github.com/santiago1891-crypto/VoxNote/releases/download/v0.1.1/VoxNote.exe)**<br>
+> **[Descargar VoxNote.exe v0.1.2](https://github.com/santiago1891-crypto/VoxNote/releases/download/v0.1.2/VoxNote.exe)**<br>
 > [Todas las versiones](https://github.com/santiago1891-crypto/VoxNote/releases)
 
 SHA-256 del ejecutable publicado:
 
 ```text
-2e996bc36c8b3b205d6a5f23d0562b0ee503c3bd8db70438ac24b2a49f990978
+f92ac3f6eebc4ba4fdea833a7edf103449877aed1a8e352388dd17dd72ed4891
 ```
 
 Puedes comprobarlo con `certutil -hashfile .\VoxNote.exe SHA256`.
@@ -205,7 +205,7 @@ El spec incluye `frontend/dist`, los modelos ONNX del VAD de faster-whisper, las
 Con [GitHub CLI](https://cli.github.com/) autenticado:
 
 ```powershell
-gh release create v0.1.1 .\dist\VoxNote.exe --title "VoxNote 0.1.1" --notes "Correcciones de estabilidad en transcripción, exportación y resumen."
+gh release create v0.1.2 .\dist\VoxNote.exe --title "VoxNote 0.1.2" --notes "Correcciones de robustez en el resumen de transcripciones largas, la exportación de recientes y la lectura de archivos TXT."
 ```
 
 > El ejecutable no está firmado. Para distribución pública conviene firmarlo con un certificado de código y así evitar el aviso de SmartScreen.
@@ -405,7 +405,7 @@ cd python
 .\.venv\Scripts\python.exe -m pytest
 ```
 
-**33 pruebas** en verde. Cubren:
+**67 pruebas** en verde. Cubren:
 
 - Exportación TXT y SRT, marcas de tiempo y caracteres especiales.
 - Inspección y decodificación de audio con PyAV.

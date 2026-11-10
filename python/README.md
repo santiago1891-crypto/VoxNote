@@ -84,6 +84,8 @@ key en el Administrador de credenciales de Windows (nunca en el repositorio).
 | `--initial-prompt` | Texto de contexto para orientar vocabulario/estilo |
 | `--no-vad` | Desactivar el filtro de silencios |
 | `--cpu-threads` | Hilos de CPU; `0` = automático |
+| `--summary` | Generar también el resumen en PDF con Gemini |
+| `--gemini-model` / `--gemini-key` | Modelo y clave de Gemini |
 | `--json` | Emitir eventos NDJSON en stdout (integración) |
 | `--force` | Sobrescribir archivos de salida existentes |
 

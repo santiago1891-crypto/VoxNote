@@ -85,14 +85,33 @@ function loadRecent(): RecentItem[] {
     if (!raw) return [];
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return (parsed as RecentItem[])
-      .filter(
-        (item) =>
-          item &&
-          typeof item.id === "string" &&
-          item.result &&
-          Array.isArray(item.result.segments),
-      )
+    return parsed
+      .filter((item): item is RecentItem => {
+        if (!item || typeof item !== "object") return false;
+        const candidate = item as Partial<RecentItem>;
+        return (
+          typeof candidate.id === "string" &&
+          Boolean(candidate.result) &&
+          Array.isArray(candidate.result?.segments)
+        );
+      })
+      .map((item) => ({
+        // Entradas antiguas o dañadas no deben romper el panel: se completan
+        // los campos que la interfaz muestra.
+        ...item,
+        name: typeof item.name === "string" ? item.name : "",
+        path:
+          typeof item.path === "string" && item.path
+            ? item.path
+            : String(item.result.file ?? ""),
+        date: typeof item.date === "string" ? item.date : "",
+        duration: Number.isFinite(item.duration) ? item.duration : 0,
+        words: Number.isFinite(item.words) ? item.words : 0,
+        segments: Number.isFinite(item.segments)
+          ? item.segments
+          : item.result.segments.length,
+        language: typeof item.language === "string" ? item.language : "",
+      }))
       .slice(0, 8);
   } catch {
     return [];
@@ -631,7 +650,7 @@ export default function App() {
         onOpenRecent={handleOpenRecent}
         hasResult={Boolean(result)}
         hasSummary={Boolean(summary)}
-        version={status?.version ?? "0.1.1"}
+        version={status?.version ?? "0.1.2"}
       />
 
       <main className="flex min-w-0 flex-1 flex-col">

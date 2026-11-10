@@ -8,7 +8,10 @@ import pytest
 
 from voxnote.ai.gemini import _split_chunks, extract_json, normalize_summary
 from voxnote.ai.pdf import render_summary_pdf
+from voxnote.ai.service import parse_transcript_file
+from voxnote.cli import EXIT_CODES
 from voxnote.errors import AIError
+from voxnote.summarize import main as summarize_main
 
 SAMPLE = {
     "title": "Formas normales en lógica proposicional",
@@ -95,12 +98,48 @@ def test_normalize_accepts_conclusions_only():
     assert normalized["conclusions"] == ["Conclusión final"]
 
 
+def test_normalize_keeps_sections_with_only_bullets():
+    normalized = normalize_summary(
+        {"sections": [{"bullets": ["Dato uno", "Dato dos"]}]}
+    )
+    assert normalized["sections"] == [
+        {
+            "heading": "Sección",
+            "summary": "",
+            "bullets": ["Dato uno", "Dato dos"],
+        }
+    ]
+
+
 def test_split_chunks_respects_limit():
     text = "\n".join(f"linea {i} " + "x" * 40 for i in range(100))
     chunks = _split_chunks(text, 500)
     assert len(chunks) > 1
     assert all(len(chunk) <= 520 for chunk in chunks)
     assert "\n".join(chunks) == text
+
+
+def test_split_chunks_splits_single_long_line():
+    text = "palabra " * 5_000  # ~40 000 caracteres en una sola línea
+    chunks = _split_chunks(text, 1_000)
+    assert len(chunks) > 1
+    assert all(len(chunk) <= 1_000 for chunk in chunks)
+    assert "".join(chunks) == text
+
+
+def test_parse_transcript_file_strips_timestamp_marks(tmp_path: Path):
+    path = tmp_path / "clase.txt"
+    path.write_text(
+        "[00:00:03] Hola.\n[00:00:05] ¿Qué tal?\n", encoding="utf-8"
+    )
+    assert parse_transcript_file(path) == "Hola.\n¿Qué tal?"
+
+
+def test_summarize_reports_unreadable_file(tmp_path: Path, capsys):
+    path = tmp_path / "malo.txt"
+    path.write_bytes(b"\xff\xfe\x00texto")
+    assert summarize_main([str(path), "--json"]) == EXIT_CODES["READ_FAILED"]
+    assert '"code": "READ_FAILED"' in capsys.readouterr().out
 
 
 def test_pdf_renders(tmp_path: Path):

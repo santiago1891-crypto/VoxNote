@@ -127,8 +127,24 @@ def test_export_transcript_requires_content(api):
     }
 
 
+def test_export_transcript_ignores_other_file_text(api):
+    api._last_text = "texto de otra transcripción"
+    assert api.export_transcript("txt", "clase.mp4", []) == {
+        "ok": False,
+        "error": "No hay una transcripción para exportar.",
+    }
+
+
 def test_generate_summary_without_transcript(api):
     assert api.generate_summary() == {
+        "ok": False,
+        "error": "Primero transcribe un archivo.",
+    }
+
+
+def test_generate_summary_ignores_other_file_text(api):
+    api._last_text = "texto de otra transcripción"
+    assert api.generate_summary("gemini-3.5-flash", "clase.mp4", [], "") == {
         "ok": False,
         "error": "Primero transcribe un archivo.",
     }

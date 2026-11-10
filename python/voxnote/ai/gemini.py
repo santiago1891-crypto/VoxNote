@@ -334,7 +334,7 @@ def normalize_summary(raw: dict[str, Any]) -> dict[str, Any]:
         heading = _as_text(item.get("heading"))
         summary = _as_text(item.get("summary"))
         bullets = _as_string_list(item.get("bullets"))
-        if heading or summary:
+        if heading or summary or bullets:
             sections.append(
                 {
                     "heading": heading or "Sección",
@@ -393,19 +393,33 @@ def _as_string_list(value: Any) -> list[str]:
 
 
 def _split_chunks(text: str, size: int) -> list[str]:
+    if size <= 0:
+        return [text]
+
     chunks: list[str] = []
     current: list[str] = []
     length = 0
 
-    for line in text.splitlines():
-        if current and length + len(line) + 1 > size:
+    def flush() -> None:
+        nonlocal current, length
+        if current:
             chunks.append("\n".join(current))
             current = []
             length = 0
+
+    for line in text.splitlines():
+        # Una sola línea puede superar el límite (por ejemplo, una
+        # transcripción unida con espacios): se parte en trozos duros para
+        # no enviar un bloque mayor del permitido.
+        while len(line) > size:
+            flush()
+            chunks.append(line[:size])
+            line = line[size:]
+
+        if current and length + len(line) + 1 > size:
+            flush()
         current.append(line)
         length += len(line) + 1
 
-    if current:
-        chunks.append("\n".join(current))
-
+    flush()
     return chunks or [text]

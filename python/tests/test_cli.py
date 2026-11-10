@@ -42,6 +42,8 @@ def test_exit_codes_are_stable():
         ["video.mp4", "--start-minutes", "-1", "--json"],
         ["video.mp4", "--max-minutes", "nan", "--json"],
         ["video.mp4", "--max-minutes", "-2", "--json"],
+        ["video.mp4", "--max-minutes", "0", "--json"],
+        ["video.mp4", "--max-minutes", "inf", "--json"],
     ],
 )
 def test_invalid_minute_ranges_are_rejected(args, capsys):

@@ -322,7 +322,7 @@ const mockApi: VoxApi = {
       hint: mockHasKey ? "••••T0gA" : "",
       geminiModel: storedSettings().geminiModel,
       transcriptionModel: storedSettings().model,
-      version: "0.1.1",
+      version: "0.1.2",
       settingsPath: "%LOCALAPPDATA%\\VoxNote\\settings.json",
       modelsDir: "%LOCALAPPDATA%\\VoxNote\\models",
     };
@@ -418,6 +418,10 @@ export const isDesktop = (): boolean => Boolean(liveApi());
 export async function pickFile(): Promise<PickedFile | null> {
   const api = await getApi();
   const picked = await api.pick_file();
+  const failure = (picked as { error?: unknown } | null)?.error;
+  if (typeof failure === "string" && failure) {
+    throw new Error(failure);
+  }
   return picked?.path ? picked : null;
 }
 

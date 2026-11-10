@@ -371,7 +371,7 @@ export function SettingsView({
               icon="info"
               title="Acerca de VoxNote"
               subtitle="Transcripción local y resúmenes opcionales con IA."
-              badge={`v${status?.version ?? "0.1.1"}`}
+              badge={`v${status?.version ?? "0.1.2"}`}
             />
 
             <dl className="mt-4 space-y-2 text-[11px]">

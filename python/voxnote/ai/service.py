@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -107,7 +108,15 @@ def summarize_transcript(
     )
 
 
+_TIMESTAMP_PREFIX = re.compile(r"(?m)^\[\d{2}:\d{2}:\d{2}\]\s?")
+
+
 def parse_transcript_file(path: str | Path) -> str:
-    """Lee un TXT de transcripción aceptando UTF-8 con o sin BOM."""
+    """Lee un TXT de transcripción aceptando UTF-8 con o sin BOM.
+
+    VoxNote escribe cada segmento con una marca `[HH:MM:SS]`; se eliminan
+    para no enviar ruido a Gemini al resumir un TXT ya generado.
+    """
     file = Path(path).expanduser()
-    return file.read_text(encoding="utf-8-sig")
+    text = file.read_text(encoding="utf-8-sig")
+    return _TIMESTAMP_PREFIX.sub("", text).strip()

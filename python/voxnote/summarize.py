@@ -57,7 +57,7 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         transcript = parse_transcript_file(args.input)
-    except OSError as exc:
+    except (OSError, UnicodeDecodeError) as exc:
         reporter.error("READ_FAILED", f"No se pudo leer {args.input}: {exc}")
         return EXIT_CODES["READ_FAILED"]
 

@@ -166,10 +166,12 @@ def main(argv: list[str] | None = None) -> int:
         return EXIT_CODES["INVALID_ARGUMENT"]
 
     max_minutes = args.max_minutes
-    if max_minutes is not None and (not math.isfinite(max_minutes) or max_minutes < 0):
+    if max_minutes is not None and (
+        not math.isfinite(max_minutes) or max_minutes <= 0
+    ):
         reporter.error(
             "INVALID_ARGUMENT",
-            "La duración debe ser un número finito y no negativo.",
+            "La duración debe ser un número finito y mayor que cero.",
         )
         return EXIT_CODES["INVALID_ARGUMENT"]
 
@@ -177,7 +179,7 @@ def main(argv: list[str] | None = None) -> int:
         model=args.model,
         language=None if args.lang.lower() == "auto" else args.lang,
         start_seconds=start_minutes * 60,
-        duration=max_minutes * 60 if max_minutes else None,
+        duration=max_minutes * 60 if max_minutes is not None else None,
         initial_prompt=args.initial_prompt,
         vad_filter=not args.no_vad,
         cpu_threads=args.cpu_threads,
