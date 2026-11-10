@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from voxnote.cli import EXIT_CODES, build_parser
+import pytest
+
+from voxnote.cli import EXIT_CODES, build_parser, main
 
 
 def test_defaults():
@@ -30,3 +32,18 @@ def test_exit_codes_are_stable():
     assert EXIT_CODES["CANCELLED"] == 130
     assert EXIT_CODES["OUTPUT_EXISTS"] == 3
     assert EXIT_CODES["NO_AUDIO_TRACK"] == 2
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        ["video.mp4", "--start-minutes", "nan", "--json"],
+        ["video.mp4", "--start-minutes", "inf", "--json"],
+        ["video.mp4", "--start-minutes", "-1", "--json"],
+        ["video.mp4", "--max-minutes", "nan", "--json"],
+        ["video.mp4", "--max-minutes", "-2", "--json"],
+    ],
+)
+def test_invalid_minute_ranges_are_rejected(args, capsys):
+    assert main(args) == EXIT_CODES["INVALID_ARGUMENT"]
+    assert '"code": "INVALID_ARGUMENT"' in capsys.readouterr().out

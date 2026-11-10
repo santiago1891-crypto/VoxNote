@@ -80,6 +80,7 @@ export interface ApiStatus {
   version: string;
   settingsPath: string;
   modelsDir: string;
+  keyError?: string;
 }
 
 export interface PickedFile {

@@ -7,6 +7,7 @@ el formato que espera faster-whisper.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -39,7 +40,13 @@ class MediaInfo:
 
 def format_clock(seconds: float) -> str:
     """Devuelve HH:MM:SS (o MM:SS si dura menos de una hora)."""
-    seconds = max(0, int(round(seconds)))
+    try:
+        value = float(seconds)
+    except (TypeError, ValueError):
+        value = 0.0
+    if not math.isfinite(value):
+        value = 0.0
+    seconds = max(0, int(round(value)))
     hours, remainder = divmod(seconds, 3600)
     minutes, secs = divmod(remainder, 60)
     if hours:
@@ -70,6 +77,10 @@ def probe(path: str | Path) -> MediaInfo:
             )
             duration = _container_duration(container, audio)
             container_name = container.format.name or path.suffix.lstrip(".")
+            # Los atributos se leen antes de cerrar el contenedor: algunos
+            # códecs no permiten consultarlos después del cierre.
+            sample_rate = getattr(audio, "rate", None) if audio else None
+            channels = getattr(audio, "channels", None) if audio else None
     except MediaError:
         raise
     except Exception as exc:  # PyAV lanza tipos variados según el contenedor.
@@ -83,8 +94,8 @@ def probe(path: str | Path) -> MediaInfo:
         path=path,
         duration=duration,
         has_audio=audio is not None,
-        sample_rate=getattr(audio, "rate", None) if audio else None,
-        channels=getattr(audio, "channels", None) if audio else None,
+        sample_rate=sample_rate,
+        channels=channels,
         container=container_name,
     )
 
@@ -110,14 +121,18 @@ def decode_clip(
     en streaming.
     """
     path = Path(path).expanduser()
-    if start < 0:
+    start = float(start)
+    if not math.isfinite(start) or start < 0:
         raise MediaError(
             "El inicio del fragmento no puede ser negativo.", "INVALID_ARGUMENT"
         )
-    if duration is not None and duration <= 0:
-        raise MediaError(
-            "La duración del fragmento debe ser mayor que cero.", "INVALID_ARGUMENT"
-        )
+    if duration is not None:
+        duration = float(duration)
+        if not math.isfinite(duration) or duration <= 0:
+            raise MediaError(
+                "La duración del fragmento debe ser mayor que cero.",
+                "INVALID_ARGUMENT",
+            )
 
     max_samples = int(duration * TARGET_SAMPLE_RATE) if duration else None
 

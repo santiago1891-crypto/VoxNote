@@ -84,6 +84,17 @@ def test_normalize_rejects_empty_content():
     assert excinfo.value.code == "AI_RESPONSE_INVALID"
 
 
+def test_normalize_accepts_key_ideas_only():
+    normalized = normalize_summary({"key_ideas": ["Idea principal", "Otra idea"]})
+    assert normalized["overview"] == ""
+    assert normalized["key_ideas"] == ["Idea principal", "Otra idea"]
+
+
+def test_normalize_accepts_conclusions_only():
+    normalized = normalize_summary({"conclusions": ["Conclusión final"]})
+    assert normalized["conclusions"] == ["Conclusión final"]
+
+
 def test_split_chunks_respects_limit():
     text = "\n".join(f"linea {i} " + "x" * 40 for i in range(100))
     chunks = _split_chunks(text, 500)

@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from ..credentials import api_key_hint, load_api_key
+from ..errors import OutputError
 from ..report import Reporter
 from .gemini import DEFAULT_MODEL, GeminiClient, normalize_summary
 from .pdf import render_summary_pdf
@@ -61,32 +62,38 @@ def summarize_transcript(
 
     output_dir = Path(output_dir).expanduser()
     base = output_dir / f"{Path(source_name).stem or 'resumen'}_resumen"
-    base.parent.mkdir(parents=True, exist_ok=True)
 
     json_path = base.with_suffix(".json")
-    json_path.write_text(
-        json.dumps(
-            {
-                "summary": summary,
-                "meta": {
-                    "source": Path(source_name).name if source_name else "",
-                    "model": client.last_model or resolved_model,
-                    "usage": client.last_usage,
-                },
-            },
-            ensure_ascii=False,
-            indent=2,
-        ),
-        encoding="utf-8",
-    )
-
     pdf_path = base.with_suffix(".pdf")
-    render_summary_pdf(
-        summary,
-        pdf_path,
-        source_name=source_name,
-        model=client.last_model or resolved_model,
-    )
+    try:
+        base.parent.mkdir(parents=True, exist_ok=True)
+        json_path.write_text(
+            json.dumps(
+                {
+                    "summary": summary,
+                    "meta": {
+                        "source": Path(source_name).name if source_name else "",
+                        "model": client.last_model or resolved_model,
+                        "usage": client.last_usage,
+                    },
+                },
+                ensure_ascii=False,
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+
+        render_summary_pdf(
+            summary,
+            pdf_path,
+            source_name=source_name,
+            model=client.last_model or resolved_model,
+        )
+    except OSError as exc:
+        raise OutputError(
+            f"No se pudo guardar el resumen en {output_dir}: {exc}",
+            "WRITE_FAILED",
+        ) from exc
 
     if reporter is not None:
         reporter.info(f"PDF: {pdf_path}")

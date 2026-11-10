@@ -8,7 +8,10 @@ interface SettingsViewProps {
   status: ApiStatus | null;
   onSave: (settings: Settings) => void;
   onSaveKey: (key: string) => Promise<{ ok: boolean; hint?: string; error?: string }>;
-  onTestKey: (key: string) => Promise<{ ok: boolean; message?: string; error?: string }>;
+  onTestKey: (
+    key: string,
+    model?: string,
+  ) => Promise<{ ok: boolean; message?: string; error?: string }>;
   onPickFolder: () => Promise<string | null>;
   onOpenPath: (path: string) => void;
 }
@@ -25,6 +28,8 @@ const MODELS = [
 const LANGUAGES = [
   { value: "es", label: "Español" },
   { value: "en", label: "Inglés" },
+  { value: "pt", label: "Portugués" },
+  { value: "fr", label: "Francés" },
   { value: "", label: "Detección automática" },
 ] as const;
 
@@ -85,7 +90,8 @@ export function SettingsView({
   const handleTestKey = async () => {
     setKeyBusy("test");
     setFeedback(null);
-    const result = await onTestKey(apiKey);
+    // Se prueba con el modelo del borrador para no guardar antes de validar.
+    const result = await onTestKey(apiKey, draft.geminiModel);
     setKeyBusy(null);
     setFeedback({
       kind: result.ok ? "ok" : "error",
@@ -265,6 +271,13 @@ export function SettingsView({
               </div>
             </div>
 
+            {status?.keyError ? (
+              <p className="mt-2.5 flex items-start gap-1.5 text-[11px] leading-relaxed text-amber-300">
+                <Icon name="alert" size={12} className="mt-0.5 shrink-0" />
+                {status.keyError}
+              </p>
+            ) : null}
+
             <div className="mt-4">
               <span className="label">API key de Gemini</span>
               <div className="flex gap-2">
@@ -358,7 +371,7 @@ export function SettingsView({
               icon="info"
               title="Acerca de VoxNote"
               subtitle="Transcripción local y resúmenes opcionales con IA."
-              badge={`v${status?.version ?? "0.1.0"}`}
+              badge={`v${status?.version ?? "0.1.1"}`}
             />
 
             <dl className="mt-4 space-y-2 text-[11px]">

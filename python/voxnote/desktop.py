@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import sys
 import threading
@@ -26,7 +27,7 @@ from .ai.gemini import DEFAULT_MODEL as DEFAULT_GEMINI_MODEL
 from .ai.gemini import GeminiClient
 from .ai.service import summarize_transcript
 from .credentials import api_key_hint, load_api_key, save_api_key
-from .errors import CredentialError, VoxNoteError
+from .errors import CredentialError, OutputError, VoxNoteError
 from .export import write_srt, write_txt
 from .media import SUPPORTED_EXTENSIONS
 from .pipeline import (
@@ -111,8 +112,43 @@ def normalize_settings(
     gemini_model = str(payload.get("geminiModel", result["geminiModel"])).strip()
     result["geminiModel"] = gemini_model or DEFAULT_GEMINI_MODEL
 
-    result["initialPrompt"] = str(payload.get("initialPrompt", "")).strip()
+    result["initialPrompt"] = str(
+        payload.get("initialPrompt", result.get("initialPrompt", ""))
+    ).strip()
     return result
+
+
+def _finite_seconds(value: Any, default: float = 0.0) -> float:
+    """Convierte a segundos finitos y no negativos."""
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return default
+    if not math.isfinite(number):
+        return default
+    return max(0.0, number)
+
+
+def parse_segments(items: Any) -> list[Segment]:
+    """Convierte los segmentos recibidos de JavaScript en segmentos seguros."""
+    parsed: list[Segment] = []
+    if not isinstance(items, list):
+        return parsed
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        text = str(item.get("text", "")).strip()
+        if not text:
+            continue
+        start = _finite_seconds(item.get("start", 0.0))
+        end = max(_finite_seconds(item.get("end", start), start), start)
+        parsed.append(Segment(start=start, end=end, text=text))
+    return parsed
+
+
+def transcript_from_segments(items: Any) -> str:
+    """Une el texto de los segmentos para enviarlo a Gemini."""
+    return " ".join(segment.text for segment in parse_segments(items)).strip()
 
 
 def _write_settings(settings: dict[str, Any]) -> None:
@@ -242,10 +278,15 @@ class DesktopApi:
     def _busy(self) -> bool:
         return self._worker is not None and self._worker.is_alive()
 
-    def _start(self, target: Callable[[], None]) -> None:
-        thread = threading.Thread(target=target, daemon=True)
-        self._worker = thread
-        thread.start()
+    def _start(self, target: Callable[[], None]) -> bool:
+        """Arranca un worker si no hay otro en curso (comprobación atómica)."""
+        with self._lock:
+            if self._worker is not None and self._worker.is_alive():
+                return False
+            thread = threading.Thread(target=target, daemon=True)
+            self._worker = thread
+            thread.start()
+            return True
 
     # ------------------------------------------------------------- archivos
 
@@ -321,14 +362,21 @@ class DesktopApi:
         self._last_outputs = []
         self._last_source = source
 
-        self._start(lambda: self._run_transcription(source, settings))
+        if not self._start(lambda: self._run_transcription(source, settings)):
+            return {"ok": False, "error": "Ya hay un proceso en curso."}
         return {"ok": True}
 
     def _run_transcription(self, source: Path, settings: dict[str, Any]) -> None:
         reporter = UiReporter(self._emit, on_completed=self._remember)
         try:
             output_dir = Path(settings["outputDir"])
-            output_dir.mkdir(parents=True, exist_ok=True)
+            try:
+                output_dir.mkdir(parents=True, exist_ok=True)
+            except OSError as exc:
+                raise OutputError(
+                    f"No se pudo crear la carpeta de salida {output_dir}: {exc}",
+                    "WRITE_FAILED",
+                ) from exc
             run_transcription(
                 source,
                 output_dir,
@@ -371,31 +419,25 @@ class DesktopApi:
         self._cancel.set()
         return {"ok": True}
 
+    def _destination_dir(self, value: str = "") -> Path:
+        """Carpeta de salida explícita o la de los ajustes actuales."""
+        raw = str(value or "").strip()
+        if raw:
+            return Path(os.path.expandvars(os.path.expanduser(raw)))
+        return Path(self._settings["outputDir"])
+
     def export_transcript(
         self,
         formats: str = "txt",
         source: str = "",
         segments: list[dict[str, Any]] | None = None,
+        output_dir: str = "",
     ) -> dict[str, Any]:
         chosen = str(formats or "txt").lower()
         if chosen not in {"txt", "srt", "both"}:
             chosen = "txt"
 
-        parsed: list[Segment] = []
-        if isinstance(segments, list):
-            for item in segments:
-                if not isinstance(item, dict):
-                    continue
-                text = str(item.get("text", "")).strip()
-                if not text:
-                    continue
-                try:
-                    start = float(item.get("start", 0.0))
-                    end = float(item.get("end", start))
-                except (TypeError, ValueError):
-                    start, end = 0.0, 0.0
-                parsed.append(Segment(start=start, end=end, text=text))
-
+        parsed = parse_segments(segments)
         if not parsed and self._last_text:
             parsed = [Segment(start=0.0, end=0.0, text=self._last_text)]
 
@@ -403,12 +445,12 @@ class DesktopApi:
             return {"ok": False, "error": "No hay una transcripción para exportar."}
 
         name = Path(str(source or self._last_source or "transcripcion")).stem
-        output_dir = Path(self._settings["outputDir"])
-        base = output_dir / (name or "transcripcion")
+        destination = self._destination_dir(output_dir)
+        base = destination / (name or "transcripcion")
 
         paths: list[str] = []
         try:
-            output_dir.mkdir(parents=True, exist_ok=True)
+            destination.mkdir(parents=True, exist_ok=True)
             if chosen in {"txt", "both"}:
                 paths.append(str(write_txt(base.with_suffix(".txt"), parsed)))
             if chosen in {"srt", "both"}:
@@ -420,10 +462,21 @@ class DesktopApi:
 
     # ------------------------------------------------------------------ IA
 
-    def generate_summary(self, model: str | None = None) -> dict[str, Any]:
+    def generate_summary(
+        self,
+        model: str | None = None,
+        source: str = "",
+        segments: list[dict[str, Any]] | None = None,
+        output_dir: str = "",
+    ) -> dict[str, Any]:
         if self._busy:
             return {"ok": False, "error": "Ya hay un proceso en curso."}
-        if not self._last_text.strip():
+
+        # Los segmentos llegan de la interfaz: permiten resumir un resultado
+        # restaurado (por ejemplo, un reciente) aunque el backend se haya
+        # reiniciado y ya no conserve `_last_text`.
+        transcript = transcript_from_segments(segments) or self._last_text.strip()
+        if not transcript:
             return {"ok": False, "error": "Primero transcribe un archivo."}
 
         try:
@@ -437,20 +490,22 @@ class DesktopApi:
                 "error": "Falta la API key de Gemini. Configúrala en Ajustes.",
             }
 
-        transcript = self._last_text
-        source_name = str(self._last_source or "transcripcion")
-        if self._last_outputs:
-            output_dir = self._last_outputs[0].parent
+        source_name = str(source or self._last_source or "transcripcion")
+        if str(output_dir or "").strip():
+            destination = self._destination_dir(output_dir)
+        elif self._last_outputs:
+            destination = self._last_outputs[0].parent
         else:
-            output_dir = Path(self._settings["outputDir"])
+            destination = Path(self._settings["outputDir"])
         chosen_model = (model or self._settings.get("geminiModel") or "").strip()
         chosen_model = chosen_model or DEFAULT_GEMINI_MODEL
 
-        self._start(
+        if not self._start(
             lambda: self._run_summary(
-                transcript, output_dir, source_name, api_key, chosen_model
+                transcript, destination, source_name, api_key, chosen_model
             )
-        )
+        ):
+            return {"ok": False, "error": "Ya hay un proceso en curso."}
         return {"ok": True}
 
     def _run_summary(
@@ -522,7 +577,7 @@ class DesktopApi:
             return {"ok": False, "error": str(exc)}
         return {"ok": True, "hint": api_key_hint(value)}
 
-    def test_api_key(self, key: str = "") -> dict[str, Any]:
+    def test_api_key(self, key: str = "", model: str | None = None) -> dict[str, Any]:
         value = str(key or "").strip()
         if not value:
             try:
@@ -532,9 +587,11 @@ class DesktopApi:
         if not value:
             return {"ok": False, "error": "Falta la API key de Gemini."}
 
-        model = str(self._settings.get("geminiModel") or DEFAULT_GEMINI_MODEL)
+        # Permite probar el modelo del borrador antes de guardar los ajustes.
+        chosen = str(model or "").strip()
+        chosen = chosen or str(self._settings.get("geminiModel") or DEFAULT_GEMINI_MODEL)
         try:
-            client = GeminiClient(value, model=model, timeout=45.0)
+            client = GeminiClient(value, model=chosen, timeout=45.0)
             client.validate()
         except VoxNoteError as exc:
             return {"ok": False, "error": str(exc)}
@@ -543,7 +600,7 @@ class DesktopApi:
 
         return {
             "ok": True,
-            "message": f"Conexión correcta con {client.last_model or model}.",
+            "message": f"Conexión correcta con {client.last_model or chosen}.",
         }
 
     # --------------------------------------------------------------- ajustes
@@ -554,8 +611,10 @@ class DesktopApi:
     def save_settings(self, settings: dict[str, Any]) -> dict[str, Any]:
         merged = normalize_settings(settings, self._settings)
         try:
-            _write_settings(merged)
+            # Crea la carpeta de salida antes de dar los ajustes por válidos:
+            # si falla, no se escribe una configuración inservible.
             Path(merged["outputDir"]).mkdir(parents=True, exist_ok=True)
+            _write_settings(merged)
         except OSError as exc:
             return {"ok": False, "error": f"No se pudieron guardar los ajustes: {exc}"}
         self._settings = merged

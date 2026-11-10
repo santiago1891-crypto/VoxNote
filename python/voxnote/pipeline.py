@@ -6,6 +6,7 @@ misma, informa a través de un `Reporter` (consola o eventos JSON).
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, replace
 from pathlib import Path
 
@@ -13,7 +14,12 @@ from .errors import MediaError, OutputError
 from .export import write_srt, write_txt
 from .media import MediaInfo, decode_clip, probe
 from .report import Reporter
-from .transcribe import Segment, Transcriber, TranscriptionResult
+from .transcribe import (
+    Segment,
+    Transcriber,
+    TranscriptionCancelled,
+    TranscriptionResult,
+)
 
 DEFAULT_MODEL = "small"
 DEFAULT_LANGUAGE = "es"
@@ -49,11 +55,25 @@ def run_transcription(
     reporter: Reporter,
     should_cancel=None,
 ) -> TranscriptionOutcome:
-    if options.start_seconds < 0:
+    start_seconds = float(options.start_seconds)
+    if not math.isfinite(start_seconds) or start_seconds < 0:
         raise MediaError(
             "El minuto de inicio no puede ser negativo.", "INVALID_ARGUMENT"
         )
+    if options.duration is not None:
+        duration = float(options.duration)
+        if not math.isfinite(duration) or duration <= 0:
+            raise MediaError(
+                "La duración del fragmento debe ser mayor que cero.",
+                "INVALID_ARGUMENT",
+            )
+        options = replace(options, duration=duration)
+    if options.cpu_threads < 0:
+        raise MediaError(
+            "El número de hilos de CPU no puede ser negativo.", "INVALID_ARGUMENT"
+        )
 
+    _check_cancelled(should_cancel)
     extensions = _extensions_for(formats)
     output_dir = Path(output_dir).expanduser()
 
@@ -71,9 +91,16 @@ def run_transcription(
         audio_hint = f", {info.sample_rate} Hz, {info.channels} canal(es)"
     reporter.info(f"Audio:    presente{audio_hint}")
 
-    if info.duration and options.start_seconds >= info.duration:
+    if info.duration > 0:
+        if start_seconds >= info.duration:
+            raise MediaError(
+                f"El inicio está fuera del archivo ({info.duration_label}).",
+                "INVALID_ARGUMENT",
+            )
+    elif start_seconds > 0:
         raise MediaError(
-            f"El inicio está fuera del archivo ({info.duration_label}).",
+            "No se pudo determinar la duración del archivo; no se puede "
+            "empezar en un minuto distinto de cero.",
             "INVALID_ARGUMENT",
         )
 
@@ -86,6 +113,8 @@ def run_transcription(
             "OUTPUT_EXISTS",
         )
 
+    _check_cancelled(should_cancel)
+
     reporter.stage(
         "audio",
         "2/4 Preparando audio",
@@ -93,10 +122,14 @@ def run_transcription(
         duration=round(info.duration, 3),
     )
 
-    start_seconds = options.start_seconds
     clip_duration = options.duration
-    if clip_duration is not None and info.duration:
+    if clip_duration is not None and info.duration > 0:
         clip_duration = min(clip_duration, max(0.0, info.duration - start_seconds))
+    if clip_duration is not None and clip_duration <= 0:
+        raise MediaError(
+            "El fragmento solicitado queda vacío: el inicio está al final del archivo.",
+            "INVALID_ARGUMENT",
+        )
 
     if start_seconds:
         reporter.info(f"Inicio: minuto {start_seconds / 60:g}.")
@@ -105,6 +138,7 @@ def run_transcription(
     else:
         reporter.info("Archivo completo.")
 
+    _check_cancelled(should_cancel)
     reporter.info("Decodificando audio a 16 kHz mono...")
     audio = decode_clip(info.path, start=start_seconds, duration=clip_duration)
     decoded_minutes = audio.size / 16_000 / 60
@@ -112,6 +146,7 @@ def run_transcription(
         f"Audio listo: {decoded_minutes:.1f} minutos ({audio.size:,} muestras)."
     )
 
+    _check_cancelled(should_cancel)
     reporter.stage("transcription", "3/4 Cargando modelo y transcribiendo")
     transcriber = Transcriber(options.model, cpu_threads=options.cpu_threads)
     reporter.info(f"Modelo: {options.model} (CPU, int8)")
@@ -147,6 +182,7 @@ def run_transcription(
         )
 
     reporter.stage("export", "4/4 Guardando resultado")
+    _check_cancelled(should_cancel)
     outputs: list[Path] = []
     try:
         if ".txt" in extensions:
@@ -192,3 +228,8 @@ def _extensions_for(formats: str) -> tuple[str, ...]:
         f"Formato de salida desconocido: {formats!r}. "
         f"Opciones: {', '.join(FORMAT_CHOICES)}"
     )
+
+
+def _check_cancelled(should_cancel) -> None:
+    if should_cancel is not None and should_cancel():
+        raise TranscriptionCancelled("Cancelado por el usuario.")

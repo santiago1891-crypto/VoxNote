@@ -33,3 +33,18 @@ def test_srt_blocks():
 def test_srt_zero_length_segment():
     text = to_srt([Segment(1.0, 1.0, "x")])
     assert "00:00:01,000 --> 00:00:01,001" in text
+
+
+def test_timestamps_sanitize_non_finite_values():
+    assert format_timestamp(float("nan")) == "00:00:00"
+    assert format_timestamp(float("inf")) == "00:00:00"
+    assert format_timestamp(float("-inf")) == "00:00:00"
+    assert format_timestamp(-5) == "00:00:00"
+
+
+def test_srt_sanitizes_non_finite_values():
+    text = to_srt([Segment(float("nan"), float("inf"), "x")])
+    assert "00:00:00,000 --> 00:00:00,001" in text
+
+    text = to_srt([Segment(2.0, float("nan"), "y")])
+    assert "00:00:02,000 --> 00:00:02,001" in text

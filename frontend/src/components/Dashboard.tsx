@@ -20,6 +20,13 @@ import { Icon } from "./ui/Icon";
 import { ProgressBar } from "./ui/Controls";
 import { StatCard } from "./StatCard";
 
+const LANGUAGE_LABELS: Record<string, string> = {
+  es: "Español",
+  en: "Inglés",
+  pt: "Portugués",
+  fr: "Francés",
+};
+
 interface DashboardProps {
   file: PickedFile | null;
   job: JobState;
@@ -203,7 +210,11 @@ export function Dashboard({
                 />
                 <MiniOption
                   label="Idioma"
-                  value={settings.language === "es" ? "Español" : settings.language || "Auto"}
+                  value={
+                    settings.language
+                      ? (LANGUAGE_LABELS[settings.language] ?? settings.language)
+                      : "Auto"
+                  }
                   icon="globe"
                   onClick={onOpenSettings}
                 />

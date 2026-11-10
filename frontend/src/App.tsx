@@ -86,7 +86,13 @@ function loadRecent(): RecentItem[] {
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
     return (parsed as RecentItem[])
-      .filter((item) => item && typeof item.id === "string" && item.result)
+      .filter(
+        (item) =>
+          item &&
+          typeof item.id === "string" &&
+          item.result &&
+          Array.isArray(item.result.segments),
+      )
       .slice(0, 8);
   } catch {
     return [];
@@ -113,6 +119,11 @@ function toResult(event: VoxEvent): TranscriptionResult {
   };
 }
 
+function outputDirOf(result: TranscriptionResult | null, fallback: string): string {
+  const first = result?.outputs?.[0];
+  return first ? parentDir(first) : fallback;
+}
+
 export default function App() {
   const [view, setView] = useState<View>("dashboard");
   const [file, setFile] = useState<PickedFile | null>(null);
@@ -130,9 +141,23 @@ export default function App() {
   const modeRef = useRef<"transcribe" | "summary">("transcribe");
   const resultRef = useRef<TranscriptionResult | null>(null);
   resultRef.current = result;
+  const busyRef = useRef(false);
+  busyRef.current = job.status === "running" || summaryBusy;
 
   const notify = useCallback((message: ToastMessage) => setToast(message), []);
   const closeToast = useCallback(() => setToast(null), []);
+
+  // Evita pisar el estado de la interfaz mientras hay una transcripción o un
+  // resumen en curso: el backend rechazaría el nuevo trabajo.
+  const guardBusy = useCallback((): boolean => {
+    if (!busyRef.current) return false;
+    notify({
+      kind: "info",
+      title: "Hay un proceso en curso",
+      detail: "Espera a que termine o cancélalo antes de cambiar de transcripción.",
+    });
+    return true;
+  }, [notify]);
 
   /* --------------------------------------------------------------- arranque */
 
@@ -204,6 +229,9 @@ export default function App() {
         }
 
         case "info": {
+          // Los mensajes del resumen (clave, modelo, rutas) no pertenecen al
+          // registro de la transcripción.
+          if (modeRef.current === "summary") return;
           const message = String(event.message ?? "").trim();
           if (!message) return;
           setJob((current) => ({
@@ -324,6 +352,7 @@ export default function App() {
   /* -------------------------------------------------------------- acciones */
 
   const handlePickFile = useCallback(async () => {
+    if (guardBusy()) return;
     try {
       const picked = await pickFile();
       if (!picked) return;
@@ -339,14 +368,16 @@ export default function App() {
         detail: messageOf(error),
       });
     }
-  }, [notify]);
+  }, [guardBusy, notify]);
 
   const handleClearFile = useCallback(() => {
+    if (guardBusy()) return;
     setFile(null);
     setJob(freshJob());
-  }, []);
+  }, [guardBusy]);
 
   const handleTranscribe = useCallback(async () => {
+    if (guardBusy()) return;
     if (!file) {
       notify({ kind: "info", title: "Elige un archivo primero" });
       return;
@@ -380,7 +411,7 @@ export default function App() {
         detail: messageOf(error),
       });
     }
-  }, [file, notify, settings]);
+  }, [file, guardBusy, notify, settings]);
 
   const handleCancel = useCallback(async () => {
     try {
@@ -391,6 +422,7 @@ export default function App() {
   }, [notify]);
 
   const handleGenerateSummary = useCallback(async () => {
+    if (guardBusy()) return;
     const current = resultRef.current;
     if (!current) {
       notify({
@@ -415,7 +447,12 @@ export default function App() {
     setSummaryStage("Generando resumen con Gemini");
     setView("summary");
     try {
-      const response = await generateSummary(settings.geminiModel);
+      const response = await generateSummary(
+        settings.geminiModel,
+        current.file,
+        current.segments,
+        outputDirOf(current, settings.outputDir),
+      );
       if (response && response.ok === false) {
         throw new Error(response.error ?? "No se pudo iniciar el resumen.");
       }
@@ -427,14 +464,19 @@ export default function App() {
         detail: messageOf(error),
       });
     }
-  }, [notify, settings.geminiModel, status?.hasKey]);
+  }, [guardBusy, notify, settings.geminiModel, settings.outputDir, status?.hasKey]);
 
   const handleExport = useCallback(
     async (format: "txt" | "srt" | "both") => {
       const current = resultRef.current;
       if (!current) return;
       try {
-        const response = await exportTranscript(format, current.file, current.segments);
+        const response = await exportTranscript(
+          format,
+          current.file,
+          current.segments,
+          outputDirOf(current, settings.outputDir),
+        );
         if (response.ok && response.paths?.length) {
           notify({
             kind: "success",
@@ -452,13 +494,33 @@ export default function App() {
         notify({ kind: "error", title: "No se pudo exportar", detail: messageOf(error) });
       }
     },
-    [notify],
+    [notify, settings.outputDir],
   );
 
-  const handleOpenRecent = useCallback((item: RecentItem) => {
-    setResult(item.result);
-    setView("transcript");
-  }, []);
+  const handleOpenRecent = useCallback(
+    (item: RecentItem) => {
+      if (guardBusy()) return;
+      const restored = item.result;
+      setResult(restored);
+      // El resumen anterior pertenece a otro archivo: no debe reutilizarse.
+      setSummary(null);
+      setSummaryBusy(false);
+      setSummaryStage("");
+      setFile({
+        path: restored.file || item.path,
+        name: item.name || baseName(item.path),
+      });
+      setJob({
+        status: "done",
+        stage: "export",
+        message: "Transcripción completada",
+        percent: 100,
+        logs: [],
+      });
+      setView("transcript");
+    },
+    [guardBusy],
+  );
 
   const handleOpenPath = useCallback(
     async (path: string) => {
@@ -535,9 +597,9 @@ export default function App() {
     [],
   );
 
-  const handleTestKey = useCallback(async (key: string) => {
+  const handleTestKey = useCallback(async (key: string, model?: string) => {
     try {
-      return await testApiKey(key);
+      return await testApiKey(key, model);
     } catch (error) {
       return { ok: false, error: messageOf(error) };
     }
@@ -569,7 +631,7 @@ export default function App() {
         onOpenRecent={handleOpenRecent}
         hasResult={Boolean(result)}
         hasSummary={Boolean(summary)}
-        version={status?.version ?? "0.1.0"}
+        version={status?.version ?? "0.1.1"}
       />
 
       <main className="flex min-w-0 flex-1 flex-col">

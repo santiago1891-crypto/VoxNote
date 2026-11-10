@@ -18,15 +18,24 @@ interface VoxApi {
     format: "txt" | "srt" | "both",
     source: string,
     segments: Segment[],
+    outputDir: string,
   ) => Promise<{
     ok: boolean;
     paths?: string[];
     error?: string;
   }>;
-  generate_summary: (model: string) => Promise<{ ok: boolean; error?: string }>;
+  generate_summary: (
+    model: string,
+    source: string,
+    segments: Segment[],
+    outputDir: string,
+  ) => Promise<{ ok: boolean; error?: string }>;
   api_status: () => Promise<ApiStatus>;
   save_api_key: (key: string) => Promise<{ ok: boolean; hint?: string; error?: string }>;
-  test_api_key: (key: string) => Promise<{ ok: boolean; message?: string; error?: string }>;
+  test_api_key: (
+    key: string,
+    model: string,
+  ) => Promise<{ ok: boolean; message?: string; error?: string }>;
   get_settings: () => Promise<Settings>;
   save_settings: (settings: Settings) => Promise<{ ok: boolean; error?: string }>;
   open_path: (path: string) => Promise<{ ok: boolean; error?: string }>;
@@ -293,12 +302,13 @@ const mockApi: VoxApi = {
   async cancel() {
     return { ok: true };
   },
-  async export_transcript(format, source, _segments) {
-    const base = joinPath(MOCK_SETTINGS.outputDir, stemName(source || "transcripcion"));
+  async export_transcript(format, source, _segments, outputDir) {
+    const folder = outputDir || MOCK_SETTINGS.outputDir;
+    const base = joinPath(folder, stemName(source || "transcripcion"));
     const paths = format === "both" ? [`${base}.txt`, `${base}.srt`] : [`${base}.${format}`];
     return { ok: true, paths };
   },
-  async generate_summary() {
+  async generate_summary(_model, _source, _segments, _outputDir) {
     const emit = (event: VoxEvent) => dispatch(event);
     emit({ event: "stage", stage: "summary", message: "Generando resumen con Gemini" });
     window.setTimeout(() => {
@@ -312,7 +322,7 @@ const mockApi: VoxApi = {
       hint: mockHasKey ? "••••T0gA" : "",
       geminiModel: storedSettings().geminiModel,
       transcriptionModel: storedSettings().model,
-      version: "0.1.0",
+      version: "0.1.1",
       settingsPath: "%LOCALAPPDATA%\\VoxNote\\settings.json",
       modelsDir: "%LOCALAPPDATA%\\VoxNote\\models",
     };
@@ -323,7 +333,7 @@ const mockApi: VoxApi = {
     mockHasKey = true;
     return { ok: true, hint: `••••${value.slice(-4)}` };
   },
-  async test_api_key(key) {
+  async test_api_key(key, _model) {
     const value = key.trim();
     if (value.length < 12) {
       return { ok: false, error: "La API key no parece válida." };
@@ -430,14 +440,20 @@ export async function exportTranscript(
   format: "txt" | "srt" | "both",
   source: string,
   segments: Segment[],
+  outputDir = "",
 ) {
   const api = await getApi();
-  return api.export_transcript(format, source, segments);
+  return api.export_transcript(format, source, segments, outputDir);
 }
 
-export async function generateSummary(model: string) {
+export async function generateSummary(
+  model: string,
+  source: string,
+  segments: Segment[],
+  outputDir = "",
+) {
   const api = await getApi();
-  return api.generate_summary(model);
+  return api.generate_summary(model, source, segments, outputDir);
 }
 
 export async function getApiStatus(): Promise<ApiStatus> {
@@ -450,9 +466,9 @@ export async function saveApiKey(key: string) {
   return api.save_api_key(key);
 }
 
-export async function testApiKey(key: string) {
+export async function testApiKey(key: string, model = "") {
   const api = await getApi();
-  return api.test_api_key(key);
+  return api.test_api_key(key, model);
 }
 
 export async function getSettings(): Promise<Settings> {

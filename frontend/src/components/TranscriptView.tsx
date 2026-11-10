@@ -29,6 +29,7 @@ export function TranscriptView({
   onGoDashboard,
 }: TranscriptViewProps) {
   const [query, setQuery] = useState("");
+  const [copied, setCopied] = useState(false);
 
   const segments = useMemo(() => {
     if (!result) return [];
@@ -72,7 +73,10 @@ export function TranscriptView({
 
   const copyAll = async () => {
     const text = result.segments.map((segment) => segment.text).join("\n");
-    await copyText(text);
+    const ok = await copyText(text);
+    if (!ok) return;
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1_800);
   };
 
   return (
@@ -93,8 +97,8 @@ export function TranscriptView({
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <button type="button" className="btn btn-ghost btn-sm" onClick={copyAll}>
-              <Icon name="copy" size={13} />
-              Copiar
+              <Icon name={copied ? "check" : "copy"} size={13} />
+              {copied ? "Copiado" : "Copiar"}
             </button>
             <button type="button" className="btn btn-ghost btn-sm" onClick={() => onExport("txt")}>
               <Icon name="download" size={13} />
@@ -245,19 +249,24 @@ function highlight(text: string, query: string): ReactNode {
   );
 }
 
-async function copyText(text: string): Promise<void> {
+async function copyText(text: string): Promise<boolean> {
   try {
     await navigator.clipboard.writeText(text);
-    return;
+    return true;
   } catch {
     /* fallback para file:// */
   }
-  const area = document.createElement("textarea");
-  area.value = text;
-  area.style.position = "fixed";
-  area.style.opacity = "0";
-  document.body.appendChild(area);
-  area.select();
-  document.execCommand("copy");
-  document.body.removeChild(area);
+  try {
+    const area = document.createElement("textarea");
+    area.value = text;
+    area.style.position = "fixed";
+    area.style.opacity = "0";
+    document.body.appendChild(area);
+    area.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(area);
+    return ok;
+  } catch {
+    return false;
+  }
 }

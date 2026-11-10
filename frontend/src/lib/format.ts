@@ -11,10 +11,12 @@ export function formatClock(seconds: number | null | undefined): string {
 export function formatHours(seconds: number | null | undefined): string {
   if (seconds == null || !Number.isFinite(seconds)) return "—";
   const total = Math.max(0, Math.round(seconds));
-  const hours = Math.floor(total / 3600);
-  const minutes = Math.round((total % 3600) / 60);
-  if (hours > 0) return `${hours} h ${minutes} min`;
-  if (minutes > 0) return `${minutes} min`;
+  // Redondear primero a minutos evita resultados como «1 h 60 min».
+  const totalMinutes = Math.round(total / 60);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours > 0) return minutes > 0 ? `${hours} h ${minutes} min` : `${hours} h`;
+  if (totalMinutes > 0) return `${totalMinutes} min`;
   return `${total} s`;
 }
 

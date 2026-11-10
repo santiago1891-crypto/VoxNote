@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from voxnote.errors import MediaError, OutputError
+from voxnote.errors import MediaError, OutputError, TranscriptionCancelled
 from voxnote.media import decode_clip, probe
 from voxnote.pipeline import TranscribeOptions, run_transcription
 from voxnote.report import JsonReporter, Reporter
@@ -122,3 +122,55 @@ def test_decode_clip_is_used_by_probe(tmp_path: Path):
     samples = decode_clip(media)
     assert info.duration > 0
     assert samples.size > 0
+
+
+@pytest.mark.parametrize(
+    "start, duration",
+    [
+        (float("nan"), None),
+        (float("inf"), None),
+        (-1.0, None),
+        (0.0, float("nan")),
+        (0.0, float("inf")),
+        (0.0, -2.0),
+    ],
+)
+def test_invalid_ranges_fail_before_probe(tmp_path: Path, start: float, duration):
+    reporter = FakeReporter()
+    with pytest.raises(MediaError) as excinfo:
+        run_transcription(
+            tmp_path / "no-existe.mp4",
+            tmp_path / "salida",
+            options=TranscribeOptions(start_seconds=start, duration=duration),
+            reporter=reporter,
+        )
+    assert excinfo.value.code == "INVALID_ARGUMENT"
+    # La validación ocurre antes de tocar el archivo.
+    assert reporter.stages == []
+
+
+def test_start_after_end_is_rejected(tmp_path: Path):
+    media = tmp_path / "tono.wav"
+    make_tone(media, seconds=1.0)
+    reporter = FakeReporter()
+    with pytest.raises(MediaError) as excinfo:
+        run_transcription(
+            media,
+            tmp_path / "salida",
+            options=TranscribeOptions(start_seconds=5.0),
+            reporter=reporter,
+        )
+    assert excinfo.value.code == "INVALID_ARGUMENT"
+
+
+def test_cancel_before_probe(tmp_path: Path):
+    reporter = FakeReporter()
+    with pytest.raises(TranscriptionCancelled):
+        run_transcription(
+            tmp_path / "no-existe.mp4",
+            tmp_path / "salida",
+            options=TranscribeOptions(),
+            reporter=reporter,
+            should_cancel=lambda: True,
+        )
+    assert reporter.stages == []

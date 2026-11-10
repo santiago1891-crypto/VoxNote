@@ -172,6 +172,9 @@ class GeminiClient:
                     data = self._post(model, payload)
                 except AIError as exc:
                     last_error = exc
+                    # Una clave inválida no se arregla cambiando de modelo.
+                    if exc.code in {"AI_KEY_INVALID", "AI_KEY_MISSING"}:
+                        raise
                     if exc.code in TRANSIENT_CODES and attempt == 0:
                         time.sleep(2.0 * (attempt + 1))
                         continue
@@ -275,6 +278,13 @@ def _extract_text(data: dict[str, Any]) -> str:
             "AI_RESPONSE_INCOMPLETE",
         )
     if not text:
+        reason = candidate.get("finishReason")
+        if reason and reason != "STOP":
+            raise AIError(
+                f"Gemini detuvo la respuesta ({reason}). Prueba con otra "
+                "transcripción o cambia el modelo.",
+                "AI_RESPONSE_INCOMPLETE",
+            )
         raise AIError("La respuesta de Gemini vino vacía.", "AI_RESPONSE_INVALID")
 
     return text
@@ -354,7 +364,15 @@ def normalize_summary(raw: dict[str, Any]) -> dict[str, Any]:
         "keywords": _as_string_list(raw.get("keywords")),
     }
 
-    if not result["overview"] and not sections:
+    if not any(
+        [
+            result["overview"],
+            sections,
+            result["key_ideas"],
+            concepts,
+            result["conclusions"],
+        ]
+    ):
         raise AIError(
             "El resumen generado no contiene suficiente información. "
             "Prueba con otra transcripción o modelo.",

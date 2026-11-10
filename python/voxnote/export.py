@@ -2,14 +2,26 @@
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
 from .transcribe import Segment
 
 
+def _safe_seconds(seconds: float) -> float:
+    """Normaliza NaN, infinitos y valores negativos antes de formatear."""
+    try:
+        value = float(seconds)
+    except (TypeError, ValueError):
+        return 0.0
+    if not math.isfinite(value):
+        return 0.0
+    return max(0.0, value)
+
+
 def format_timestamp(seconds: float) -> str:
     """HH:MM:SS para usar como marca de tiempo en el TXT."""
-    total = max(0, int(round(seconds)))
+    total = int(round(_safe_seconds(seconds)))
     hours, remainder = divmod(total, 3600)
     minutes, secs = divmod(remainder, 60)
     return f"{hours:02d}:{minutes:02d}:{secs:02d}"
@@ -17,7 +29,7 @@ def format_timestamp(seconds: float) -> str:
 
 def _srt_timestamp(seconds: float) -> str:
     """HH:MM:SS,mmm (formato de subtítulos SubRip)."""
-    total_ms = max(0, int(round(seconds * 1000)))
+    total_ms = int(round(_safe_seconds(seconds) * 1000))
     hours, remainder = divmod(total_ms, 3_600_000)
     minutes, remainder = divmod(remainder, 60_000)
     secs, millis = divmod(remainder, 1000)
@@ -32,8 +44,8 @@ def to_timestamped_text(segments: list[Segment]) -> str:
 def to_srt(segments: list[Segment]) -> str:
     blocks: list[str] = []
     for index, segment in enumerate(segments, start=1):
-        start = segment.start
-        end = max(segment.end, segment.start + 0.001)
+        start = _safe_seconds(segment.start)
+        end = max(_safe_seconds(segment.end), start + 0.001)
         blocks.append(
             f"{index}\n{_srt_timestamp(start)} --> {_srt_timestamp(end)}\n"
             f"{segment.text}"

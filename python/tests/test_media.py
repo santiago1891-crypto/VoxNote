@@ -10,7 +10,13 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from voxnote.media import MediaError, SUPPORTED_EXTENSIONS, decode_clip, probe
+from voxnote.media import (
+    MediaError,
+    SUPPORTED_EXTENSIONS,
+    decode_clip,
+    format_clock,
+    probe,
+)
 
 
 def make_tone(path: Path, seconds: float = 1.0, rate: int = 8_000) -> None:
@@ -28,6 +34,15 @@ def make_tone(path: Path, seconds: float = 1.0, rate: int = 8_000) -> None:
 def test_supported_extensions_includes_common_formats():
     for extension in (".mp4", ".mkv", ".mp3", ".m4a", ".wav", ".flac"):
         assert extension in SUPPORTED_EXTENSIONS
+
+
+def test_format_clock_sanitizes_non_finite_values():
+    assert format_clock(0) == "00:00"
+    assert format_clock(61) == "01:01"
+    assert format_clock(3725) == "01:02:05"
+    assert format_clock(float("nan")) == "00:00"
+    assert format_clock(float("inf")) == "00:00"
+    assert format_clock(-3) == "00:00"
 
 
 def test_probe_missing_file(tmp_path: Path):
@@ -79,3 +94,8 @@ def test_decode_clip_rejects_invalid_arguments(tmp_path: Path):
     with pytest.raises(MediaError) as excinfo:
         decode_clip(file, duration=0)
     assert excinfo.value.code == "INVALID_ARGUMENT"
+
+    for start, duration in ((float("nan"), None), (0.0, float("inf")), (0.0, float("nan"))):
+        with pytest.raises(MediaError) as excinfo:
+            decode_clip(file, start=start, duration=duration)
+        assert excinfo.value.code == "INVALID_ARGUMENT"

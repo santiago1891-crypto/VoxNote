@@ -10,6 +10,7 @@ Uso:
 from __future__ import annotations
 
 import argparse
+import math
 from pathlib import Path
 
 from .errors import VoxNoteError
@@ -156,11 +157,27 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     reporter = JsonReporter() if args.json else ConsoleReporter()
 
+    start_minutes = float(args.start_minutes)
+    if not math.isfinite(start_minutes) or start_minutes < 0:
+        reporter.error(
+            "INVALID_ARGUMENT",
+            "El minuto de inicio debe ser un número finito y no negativo.",
+        )
+        return EXIT_CODES["INVALID_ARGUMENT"]
+
+    max_minutes = args.max_minutes
+    if max_minutes is not None and (not math.isfinite(max_minutes) or max_minutes < 0):
+        reporter.error(
+            "INVALID_ARGUMENT",
+            "La duración debe ser un número finito y no negativo.",
+        )
+        return EXIT_CODES["INVALID_ARGUMENT"]
+
     options = TranscribeOptions(
         model=args.model,
         language=None if args.lang.lower() == "auto" else args.lang,
-        start_seconds=max(0.0, args.start_minutes * 60),
-        duration=args.max_minutes * 60 if args.max_minutes else None,
+        start_seconds=start_minutes * 60,
+        duration=max_minutes * 60 if max_minutes else None,
         initial_prompt=args.initial_prompt,
         vad_filter=not args.no_vad,
         cpu_threads=args.cpu_threads,
@@ -206,6 +223,10 @@ def main(argv: list[str] | None = None) -> int:
         reporter.finish_progress()
         reporter.error(exc.code, str(exc))
         return EXIT_CODES.get(exc.code, 1)
+    except OSError as exc:
+        reporter.finish_progress()
+        reporter.error("WRITE_FAILED", f"No se pudo leer o escribir en disco: {exc}")
+        return 1
 
 
 if __name__ == "__main__":

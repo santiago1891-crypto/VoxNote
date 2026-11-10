@@ -57,6 +57,11 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         transcript = parse_transcript_file(args.input)
+    except OSError as exc:
+        reporter.error("READ_FAILED", f"No se pudo leer {args.input}: {exc}")
+        return EXIT_CODES["READ_FAILED"]
+
+    try:
         artifacts = summarize_transcript(
             transcript,
             args.out,
@@ -79,6 +84,9 @@ def main(argv: list[str] | None = None) -> int:
     except VoxNoteError as exc:
         reporter.error(exc.code, str(exc))
         return EXIT_CODES.get(exc.code, 1)
+    except OSError as exc:
+        reporter.error("WRITE_FAILED", f"No se pudo guardar o leer en disco: {exc}")
+        return 1
 
 
 if __name__ == "__main__":

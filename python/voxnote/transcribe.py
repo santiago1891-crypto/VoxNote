@@ -127,7 +127,13 @@ class Transcriber:
         `initial_prompt` sirve para orientar vocabulario y estilo (por ejemplo,
         un glosario de términos técnicos) sin reentrenar el modelo.
         """
+        if should_cancel is not None and should_cancel():
+            raise TranscriptionCancelled("Cancelado por el usuario.")
+
         model = self.load()
+
+        if should_cancel is not None and should_cancel():
+            raise TranscriptionCancelled("Cancelado por el usuario.")
 
         source: str | np.ndarray
         if isinstance(audio, np.ndarray):
